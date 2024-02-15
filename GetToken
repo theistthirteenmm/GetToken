@@ -1,0 +1,69 @@
+
+import org.springframework.http.*;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
+
+public class GetToken {
+
+
+    RestTemplate restTemplate =new RestTemplate();
+
+    String TOKEN_API = "token.api";
+    String TOKEN_API_GRANT_TYPE = "token.api.grant_type";
+    String TOKEN_API_CLIENT_ID = "token.api.client_id";
+    String TOKEN_API_CLIENT_SECRET = "token.api.client_secret";
+    String TOKEN_API_USERNAME = "token.api.username";
+    String TOKEN_API_PSW = "token.api.psw";
+
+    String tokenApi = ServerPropertiesUtil.getDefaultInstance().getString(TOKEN_API);
+    String tokenGrantType = ServerPropertiesUtil.getDefaultInstance().getString(TOKEN_API_GRANT_TYPE);
+    String tokenClientId = ServerPropertiesUtil.getDefaultInstance().getString(TOKEN_API_CLIENT_ID);
+    String tokenClientSecret = ServerPropertiesUtil.getDefaultInstance().getString(TOKEN_API_CLIENT_SECRET);
+    String tokenUserName = ServerPropertiesUtil.getDefaultInstance().getString(TOKEN_API_USERNAME);
+    String tokenPsw = ServerPropertiesUtil.getDefaultInstance().getString(TOKEN_API_PSW);
+
+    public String getToken(){
+
+        MultiValueMap<String, String> oauthPayload = new LinkedMultiValueMap<String, String>();
+        oauthPayload.add("grant_type", tokenGrantType);
+        oauthPayload.add("client_id", tokenClientId);
+        oauthPayload.add("client_secret", tokenClientSecret);
+        oauthPayload.add("username", tokenUserName);
+        oauthPayload.add("password", tokenPsw);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        HttpEntity<?> entity = new HttpEntity<>(oauthPayload, headers);
+        ResponseEntity<TokenApiDto> tokenApiDto = restTemplate.exchange(
+                tokenApi, HttpMethod.POST, entity, TokenApiDto.class);
+        String accessToken;
+        if(tokenApiDto.getStatusCodeValue()!=200){
+            throw RemoteExceptionRegistry.create(RemoteExceptionRegistry.ERROR_UNAUTHORIZED, "ارتباط با سرور  برقرار نشد");
+        }else{
+            accessToken = tokenApiDto.getBody().getAccess_token();
+            return accessToken;
+        }
+    }
+
+
+    public ResponseEntity sendToService(VotePrimaryExaminationDto votePrimaryExamination) {
+        HttpHeaders headers=new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        GetToken Token = new GetToken();
+        try{
+            headers.setBearerAuth(Token.getToken());
+            HttpEntity<?> entity = new HttpEntity<>(votePrimaryExamination, headers);
+            ResponseEntity<VotePrimaryExaminationDto> selfApiDto = restTemplate.exchange(
+                    votePrimaryExamination, HttpMethod.POST, entity, VotePrimaryExaminationDto.class);
+            if (selfApiDto.getStatusCode().value() != 200) {
+                throw RemoteExceptionRegistry.create(RemoteExceptionRegistry.ERROR_SERVER, selfApiDto.getBody().toString());
+            } else {
+                return new ResponseEntity(HttpStatus.OK);
+            }
+        }catch (Exception e){
+            throw RemoteExceptionRegistry.create(RemoteExceptionRegistry.ERROR_SERVER, "ارتباط با سرور  برقرار نشد");
+        }
+    }
+
+}
